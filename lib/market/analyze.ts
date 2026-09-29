@@ -1,4 +1,4 @@
-import type { MarketCard, ScanResult } from "./types";
+import type { MarketCard, MarketSignal, ScanResult } from "./types";
 
 type ScanOptions = {
   budget: number;
@@ -40,14 +40,15 @@ export function scanMarket(
       const momentumScore = clamp(
         50 + momentum1h * 8 + momentum6h * 2
       );
-      const liquidityScore = clamp(card.observations24h * 4);
+      // Snapshot count measures coverage, not trade volume or liquidity.
+      const coverageScore = clamp(card.observations24h * 4);
       const rangeScore = clamp(100 - rangePosition);
       const reboundScore = clamp(45 + drawdown24h * 4);
 
       const opportunityScore = Math.round(
         valueScore * 0.30 +
         momentumScore * 0.25 +
-        liquidityScore * 0.15 +
+        coverageScore * 0.15 +
         rangeScore * 0.20 +
         reboundScore * 0.10
       );
@@ -68,7 +69,7 @@ export function scanMarket(
         )
       );
 
-      const signal =
+      const signal: MarketSignal =
         opportunityScore >= 67 && netRoiPct >= 4
           ? "BUY"
           : opportunityScore >= 52 && netRoiPct >= 1

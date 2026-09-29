@@ -7,6 +7,8 @@ export default function Home() {
   const [budget, setBudget] = useState(200000);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [source, setSource] = useState("Run a scan to see the source");
+  const [message, setMessage] = useState("");
 
   async function scan(event: FormEvent) {
     event.preventDefault();
@@ -14,10 +16,16 @@ export default function Home() {
 
     try {
       const response = await fetch(`/api/scan?budget=${budget}`);
-      if (!response.ok) throw new Error("Scan failed");
-
       const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Scan failed");
       setResults(body.results);
+      setSource(body.source);
+      setMessage(body.results.length ? "" : body.source.startsWith("Stored")
+        ? "No cards have complete, recent 24-hour PC history yet. Keep collecting snapshots and try again."
+        : "No cards fit this budget.");
+    } catch (error) {
+      setResults([]);
+      setMessage(error instanceof Error ? error.message : "Scan failed");
     } finally {
       setLoading(false);
     }
@@ -31,7 +39,7 @@ export default function Home() {
           <h1>Market Scanner</h1>
           <p>
             Find cards that fit your coin balance and rank them by value,
-            momentum, liquidity and tax-adjusted upside.
+            momentum, snapshot coverage and tax-adjusted upside.
           </p>
         </div>
 
@@ -54,9 +62,8 @@ export default function Home() {
       </header>
 
       <section className="notice">
-        MVP currently runs on mock price observations. The provider layer is
-        intentionally replaceable so live FC27 data can be connected without
-        rewriting the scanner.
+        Source: {source}. Prices from a third party may lag the market. Signals
+        are estimates, not verified trading profits.
       </section>
 
       <section className="grid">
@@ -79,7 +86,7 @@ export default function Home() {
               <div><span>Price</span><strong>{item.currentPrice.toLocaleString()}</strong></div>
               <div><span>Target</span><strong>{item.targetPrice.toLocaleString()}</strong></div>
               <div><span>Net ROI</span><strong>{item.netRoiPct.toFixed(1)}%</strong></div>
-              <div><span>Confidence</span><strong>{item.confidence}%</strong></div>
+              <div><span>Heuristic confidence</span><strong>{item.confidence}%</strong></div>
             </div>
 
             <div className="score">
@@ -92,9 +99,9 @@ export default function Home() {
         ))}
       </section>
 
-      {!results.length && (
+      {(message || !results.length) && (
         <div className="empty">
-          Enter your budget and run the first market scan.
+          {message || "Enter your budget and run the first market scan."}
         </div>
       )}
     </main>
