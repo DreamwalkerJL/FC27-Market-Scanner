@@ -9,19 +9,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid budget" }, { status: 400 });
   }
 
-  const provider = getMarketProvider();
-  const cards = await provider.getMarketCards();
+  try {
+    const provider = getMarketProvider();
+    const cards = await provider.getMarketCards();
 
-  const results = scanMarket(cards, {
-    budget,
-    platform: "pc",
-    maxPositionSizePct: 1
-  });
+    const results = scanMarket(cards, {
+      budget,
+      platform: "pc",
+      maxPositionSizePct: 1
+    });
 
-  return NextResponse.json({
-    generatedAt: new Date().toISOString(),
-    budget,
-    platform: "pc",
-    results
-  });
+    return NextResponse.json({
+      generatedAt: new Date().toISOString(),
+      budget,
+      platform: "pc",
+      source: process.env.MARKET_DATA_PROVIDER === "postgres" ? "Stored PC price snapshots (Parse.bot / FUTBIN)" : "Mock example prices",
+      cardsAnalyzed: cards.length,
+      results
+    });
+  } catch (error) {
+    console.error("Market scan failed", error);
+    return NextResponse.json({ error: "Market data unavailable. Check the database connection and server logs." }, { status: 503 });
+  }
 }
