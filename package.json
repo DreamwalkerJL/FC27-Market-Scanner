@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "setup:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1",
     "collect": "node --env-file=.env.local --import tsx scripts/collect.ts",
     "discover": "node --env-file=.env.local --import tsx scripts/collect.ts --discover"
   },

@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fc27
+      POSTGRES_USER: fc27
+      POSTGRES_PASSWORD: fc27_local_dev
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - fc27_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fc27 -d fc27"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+volumes:
+  fc27_data:
