@@ -22,7 +22,26 @@ async function request(endpoint: string, params: Record<string, string>) {
   if (!response.ok) throw new Error(`Provider ${endpoint}: HTTP ${response.status}`);
   const envelope = object(await response.json());
   if (envelope.status && envelope.status !== "success") throw new Error(`Provider ${endpoint} returned ${String(envelope.status)}`);
-  return object(envelope.data ?? envelope);
+  const data = envelope.data ?? envelope;
+  return Array.isArray(data) ? { players: data } : object(data);
+}
+
+function findPlayerRows(input: Json, endpoint: string): { payload: Json; rows: unknown[] } {
+  const queue: Json[] = [input];
+  const seen = new Set<Json>();
+  while (queue.length) {
+    const payload = queue.shift()!;
+    if (seen.has(payload)) continue;
+    seen.add(payload);
+    for (const key of ["players", "results", "items", "cards", "rows"]) {
+      if (Array.isArray(payload[key])) return { payload, rows: payload[key] as unknown[] };
+    }
+    for (const key of ["data", "result", "output", "response", "payload"]) {
+      const nested = payload[key];
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) queue.push(nested as Json);
+    }
+  }
+  throw new Error(`${endpoint}: player list missing. Response fields: ${Object.keys(input).join(", ") || "(none)"}`);
 }
 
 function positiveInt(value: unknown): number | null {
@@ -38,8 +57,7 @@ async function discover() {
       page: String(page), platform: "pc", min_price: "1000",
       max_price: "200000", sort_by_price: "desc"
     });
-    const players = result.players;
-    if (!Array.isArray(players)) throw new Error("Player list missing in provider response");
+    const { payload, rows: players } = findPlayerRows(result, "list_fc27_players");
     for (const raw of players) {
       const p = object(raw);
       const id = positiveInt(p.id);
@@ -56,7 +74,7 @@ async function discover() {
       );
       count++;
     }
-    if (!result.has_more) break;
+    if (!(payload.has_more ?? result.has_more)) break;
   }
   console.log(`Discovered ${count} FC27 cards (PC price filter, up to ${pages} pages).`);
 }
@@ -73,15 +91,17 @@ async function snapshot() {
       player_ids: batch.map((row) => row.provider_card_id).join(","),
       year: "27", platform: "pc"
     });
-    if (String(result.platform).toLowerCase() !== "pc" || String(result.year) !== "27" || !Array.isArray(result.players)) {
-      throw new Error("Snapshot platform/year/payload mismatch; no prices saved");
+    const { payload, rows: players } = findPlayerRows(result, "get_fc27_market_snapshot");
+    const meta = { ...result, ...payload };
+    if (String(meta.platform).toLowerCase() !== "pc" || String(meta.year) !== "27") {
+      throw new Error("Snapshot platform/year mismatch; no prices saved");
     }
-    const timestamp = Number(result.timestamp);
+    const timestamp = Number(meta.timestamp);
     if (!Number.isFinite(timestamp) || Math.abs(Date.now() - timestamp) > 10 * 60_000) {
       throw new Error("Snapshot timestamp missing or stale");
     }
     const ids = new Map(batch.map((row) => [row.provider_card_id, row.id]));
-    for (const raw of result.players) {
+    for (const raw of players) {
       const p = object(raw);
       const cardId = ids.get(String(p.player_id));
       const price = positiveInt(p.price);
