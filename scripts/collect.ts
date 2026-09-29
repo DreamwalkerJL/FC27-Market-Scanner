@@ -98,12 +98,16 @@ async function snapshot() {
   console.log(`Stored ${saved} PC prices at ${new Date().toISOString()}.`);
 }
 
-try {
-  if (process.argv.includes("--discover")) await discover();
-  await snapshot();
-} catch (error) {
-  console.error(error);
-  process.exitCode = 1;
-} finally {
-  await getPool().end();
+async function main() {
+  try {
+    if (process.argv.includes("--discover")) await discover();
+    await snapshot();
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  } finally {
+    await getPool().end();
+  }
 }
+
+void main();
